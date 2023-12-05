@@ -4,7 +4,8 @@
 
 #include "cache.h"
 
-constexpr int PREFETCH_DEGREE = 3;
+constexpr int PREFETCH_DEGREE = 4;
+
 
 struct tracker_entry {
   uint64_t ip = 0;              // the IP we're tracking
@@ -30,7 +31,12 @@ void CACHE::prefetcher_cycle_operate()
 {
   // If a lookahead is active
   if (auto [old_pf_address, stride, degree] = lookahead[this]; degree > 0) {
+    //auto old_pfd_address = old_pf_address*64;
     auto pf_address = old_pf_address + (stride << LOG2_BLOCK_SIZE);
+    
+ 
+    //std::cout << "stride " << stride << std::endl;
+    //std::cout << "pf_address  " << pf_address << std::endl;
 
     // If the next step would exceed the degree or run off the page, stop
     if (virtual_prefetch || (pf_address >> LOG2_PAGE_SIZE) == (old_pf_address >> LOG2_PAGE_SIZE)) {
@@ -54,7 +60,9 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
   // get boundaries of tracking set
   auto set_begin = std::next(std::begin(trackers[this]), ip % TRACKER_SETS);
   auto set_end = std::next(set_begin, TRACKER_WAYS);
-
+  //std::cout << "ip  " << ip << std::endl;
+  //std::cout << "address  " << addr << std::endl;
+  //std::cout<<"cache_hit " << addr << std::endl; 
   // find the current ip within the set
   auto found = std::find_if(set_begin, set_end, [ip](tracker_entry x) { return x.ip == ip; });
 
@@ -67,7 +75,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     // Initialize prefetch state unless we somehow saw the same address twice in
     // a row or if this is the first time we've seen this stride
     if (stride != 0 && stride == found->last_stride)
-      lookahead[this] = {cl_addr, stride, PREFETCH_DEGREE};
+      lookahead[this] = {addr, stride, PREFETCH_DEGREE};
   } else {
     // replace by LRU
     found = std::min_element(set_begin, set_end, [](tracker_entry x, tracker_entry y) { return x.last_used_cycle < y.last_used_cycle; });
